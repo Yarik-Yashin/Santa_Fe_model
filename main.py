@@ -2,10 +2,11 @@ import random
 import math
 import matplotlib.pyplot as plt
 from celluloid import Camera
+import numpy as np
 
-NU = 0.012
-MU = 7
-LAMBDA = 0.222
+NU = 0.1
+MU = 0.1
+LAMBDA = 1
 t = 0
 DT = 1
 spread = 3
@@ -53,7 +54,21 @@ pl = plt.figure()
 camera = Camera(pl)
 limit_order_book = [OrderQueue(i) for i in range(100)]
 middle_prices = [[], [], [], [], [], [], [], [], [], []]
-for r in range(10):
+returns = [[], [], [], [], [], [], [], [], [], []]
+sigma_r = [[], [], [], [], [], [], [], [], [], []]
+for q in range(3):
+    if q == 0:
+        NU = 0.1
+        MU = 0.1
+        LAMBDA = 1
+    if q == 1:
+        NU = 0.01
+        MU = 1
+        LAMBDA = 1
+    else:
+        NU = 1
+        MU = 1
+        LAMBDA = 1
     a = 0
     b = 100
     t = 0
@@ -102,7 +117,12 @@ for r in range(10):
             if i == a and limit_order_book[i].order_sum() == 0 and a != 0:
                 a -= 1
         t += DT
-        middle_prices[r].append(m)
-for i in range(10):
-    plt.plot([j for j in range(1000)], middle_prices[i])
-plt.show()
+        middle_prices[q].append(m)
+for i in range(3):
+    for j in range(1, len(middle_prices[i])):
+        returns[i].append((middle_prices[i][j] - middle_prices[i][j - 1]) / middle_prices[i][j - 1])
+        sigma_r[i].append(np.std(np.array(returns[i][:j])))
+for i in range(3):
+    plt.plot([j for j in range(999)], [sigma_r[i][j] ** 2 * middle_prices[i][j + 1] ** 2 for j in range(999)])
+plt.semilogy()
+plt.savefig("file.png")
