@@ -1,13 +1,12 @@
 import random
-import math
+from math import sqrt
 import matplotlib.pyplot as plt
-from celluloid import Camera
 import numpy as np
+import math
 
 NU = 0.1
 MU = 0.1
 LAMBDA = 1
-t = 0
 DT = 1
 spread = 3
 
@@ -50,35 +49,25 @@ class OrderQueue:
         return sum([i.volume for i in self.orders])
 
 
+def create_order_queue(size):
+    return [OrderQueue(i) for i in range(size)]
+
+
 pl = plt.figure()
-camera = Camera(pl)
-limit_order_book = [OrderQueue(i) for i in range(100)]
-middle_prices = [[], [], [], [], [], [], [], [], [], []]
-returns = [[], [], [], [], [], [], [], [], [], []]
-sigma_r = [[], [], [], [], [], [], [], [], [], []]
-for q in range(3):
-    if q == 0:
-        NU = 0.1
-        MU = 0.1
-        LAMBDA = 1
-    if q == 1:
-        NU = 0.01
-        MU = 1
-        LAMBDA = 1
-    else:
-        NU = 1
-        MU = 1
-        LAMBDA = 1
+
+
+def count_middle_prices(lambda_, nu_, mu_, t_max, limit_order_book):
+    t = 0
     a = 0
     b = 100
-    t = 0
-    while t < 1000:
+    middle_prices = list()
+    while t < t_max:
         m = (a + b) / 2
 
         for i in range(max(int(m) - spread * 5, 0), min(int(m) + spread * 5, 100)):
-            la = value_of_poisson(LAMBDA, 10)
+            la = value_of_poisson(lambda_, 10)
             for j in range(la):
-                v = value_of_poisson(LAMBDA / NU, 10) + 1
+                v = value_of_poisson(lambda_ / nu_, 10) + 1
                 if i <= m:
                     limit_order_book[i].add_order(Order(v, t))
                     a = i if a <= i else a
@@ -89,13 +78,13 @@ for q in range(3):
         for i in range(50 - spread * 5, 50 + spread * 5):
             for_delete = list()
             for j in range(len(limit_order_book[i].orders)):
-                nu = value_of_poisson(NU, 1)
+                nu = value_of_poisson(nu_, 1)
                 if nu:
                     for_delete.append(j)
             for j in for_delete[::-1]:
                 limit_order_book[i].cancel_order(j)
-        market_sell = value_of_poisson(MU, 10)
-        market_buy = value_of_poisson(MU, 10)
+        market_sell = value_of_poisson(mu_, 10)
+        market_buy = value_of_poisson(mu_, 10)
         for i in range(b, 100):
             for j in range(len(limit_order_book[i].orders)):
                 if abs(limit_order_book[i].orders[j].volume) >= market_buy:
@@ -117,12 +106,38 @@ for q in range(3):
             if i == a and limit_order_book[i].order_sum() == 0 and a != 0:
                 a -= 1
         t += DT
-        middle_prices[q].append(m)
-for i in range(3):
-    for j in range(1, len(middle_prices[i])):
-        returns[i].append((middle_prices[i][j] - middle_prices[i][j - 1]) / middle_prices[i][j - 1])
-        sigma_r[i].append(np.std(np.array(returns[i][:j])))
-for i in range(3):
-    plt.plot([j for j in range(999)], [sigma_r[i][j] ** 2 * middle_prices[i][j + 1] ** 2 for j in range(999)])
-plt.semilogy()
+        middle_prices.append(m)
+    return middle_prices
+
+
+middle_prices_1 = count_middle_prices(1, 1, 1, 10000, create_order_queue(100))
+sigma_tau_1 = []
+for tau in range(1, 1000):
+    middle_prices_tau = [middle_prices_1[i] for i in range(len(middle_prices_1)) if i % tau == 0]
+    returns_tau = [(middle_prices_tau[i] - middle_prices_tau[i - 1]) / middle_prices_tau[i - 1] for i in
+                   range(1, len(middle_prices_tau))]
+    sigma_tau_1.append(np.std(np.array(returns_tau)) / sqrt(tau))
+
+plt.plot(sigma_tau_1, 'red')
+
+middle_prices_2 = count_middle_prices(1, 0.01, 1, 10000, create_order_queue(100))
+sigma_tau_2 = []
+for tau in range(1, 1000):
+    middle_prices_tau = [middle_prices_2[i] for i in range(len(middle_prices_2)) if i % tau == 0]
+    returns_tau = [(middle_prices_tau[i] - middle_prices_tau[i - 1]) / middle_prices_tau[i - 1] for i in
+                   range(1, len(middle_prices_tau))]
+    sigma_tau_2.append(np.std(np.array(returns_tau)) / sqrt(tau))
+plt.plot(sigma_tau_2, 'green')
+
+middle_prices_3 = count_middle_prices(1, 0.1, 0.1, 10000, create_order_queue(100))
+sigma_tau_3 = []
+for tau in range(1, 1000):
+    middle_prices_tau = [middle_prices_3[i] for i in range(len(middle_prices_3)) if i % tau == 0]
+    returns_tau = [(middle_prices_tau[i] - middle_prices_tau[i - 1]) / middle_prices_tau[i - 1] for i in
+                   range(1, len(middle_prices_tau))]
+    sigma_tau_3.append(np.std(np.array(returns_tau)) / sqrt(tau))
+
+plt.plot(sigma_tau_3, 'blue')
+
+plt.loglog()
 plt.savefig("file.png")
