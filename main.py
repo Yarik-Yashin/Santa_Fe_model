@@ -56,15 +56,18 @@ def create_order_queue(size):
 pl = plt.figure()
 
 
-def count_middle_prices(lambda_, nu_, mu_, t_max, limit_order_book):
+def simulate_model(lambda_, nu_, mu_, t_max, limit_order_book):
     t = 0
     a = 0
     b = 100
+    size = len(limit_order_book)
     middle_prices = list()
+    total_volume = list()
     while t < t_max:
+        v = 0
         m = (a + b) / 2
 
-        for i in range(max(int(m) - spread * 5, 0), min(int(m) + spread * 5, 100)):
+        for i in range(max(int(m) - spread * 5, 0), min(int(m) + spread * 5, size)):
             la = value_of_poisson(lambda_, 10)
             for j in range(la):
                 v = value_of_poisson(lambda_ / nu_, 10) + 1
@@ -75,7 +78,7 @@ def count_middle_prices(lambda_, nu_, mu_, t_max, limit_order_book):
                     limit_order_book[i].add_order((Order(-v, t)))
                     b = i if b >= i else b
 
-        for i in range(50 - spread * 5, 50 + spread * 5):
+        for i in range(size // 2 - spread * 5, size // 2 + spread * 5):
             for_delete = list()
             for j in range(len(limit_order_book[i].orders)):
                 nu = value_of_poisson(nu_, 1)
@@ -85,7 +88,7 @@ def count_middle_prices(lambda_, nu_, mu_, t_max, limit_order_book):
                 limit_order_book[i].cancel_order(j)
         market_sell = value_of_poisson(mu_, 10)
         market_buy = value_of_poisson(mu_, 10)
-        for i in range(b, 100):
+        for i in range(b, size):
             for j in range(len(limit_order_book[i].orders)):
                 if abs(limit_order_book[i].orders[j].volume) >= market_buy:
                     limit_order_book[i].orders[j].volume += market_buy
@@ -99,45 +102,31 @@ def count_middle_prices(lambda_, nu_, mu_, t_max, limit_order_book):
                 else:
                     market_sell -= limit_order_book[i].orders[j].volume
                     limit_order_book[i].orders[j].volume = 0
-        for i in range(b, 100):
-            if i == b and limit_order_book[i].order_sum() == 0 and b != 100:
+        for i in range(b, size):
+            if i == b and limit_order_book[i].order_sum() == 0 and b != size:
                 b += 1
         for i in range(a, 0, -1):
             if i == a and limit_order_book[i].order_sum() == 0 and a != 0:
                 a -= 1
+        for i in range(size):
+            v += abs(limit_order_book[i].order_sum())
         t += DT
         middle_prices.append(m)
-    return middle_prices
+        total_volume.append(v)
+    return middle_prices, total_volume
 
 
-middle_prices_1 = count_middle_prices(1, 1, 1, 10000, create_order_queue(100))
-sigma_tau_1 = []
-for tau in range(1, 1000):
-    middle_prices_tau = [middle_prices_1[i] for i in range(len(middle_prices_1)) if i % tau == 0]
-    returns_tau = [(middle_prices_tau[i] - middle_prices_tau[i - 1]) / middle_prices_tau[i - 1] for i in
-                   range(1, len(middle_prices_tau))]
-    sigma_tau_1.append(np.std(np.array(returns_tau)) / sqrt(tau))
+total_volume1 = simulate_model(1, 1, 1, 1000, create_order_queue(100))[1]
 
-plt.plot(sigma_tau_1, 'red')
+total_volume2 = simulate_model(1, 0.1, 1, 1000, create_order_queue(100))[1]
 
-middle_prices_2 = count_middle_prices(1, 0.01, 1, 10000, create_order_queue(100))
-sigma_tau_2 = []
-for tau in range(1, 1000):
-    middle_prices_tau = [middle_prices_2[i] for i in range(len(middle_prices_2)) if i % tau == 0]
-    returns_tau = [(middle_prices_tau[i] - middle_prices_tau[i - 1]) / middle_prices_tau[i - 1] for i in
-                   range(1, len(middle_prices_tau))]
-    sigma_tau_2.append(np.std(np.array(returns_tau)) / sqrt(tau))
-plt.plot(sigma_tau_2, 'green')
+total_volume3 = simulate_model(0.1, 1, 1, 1000, create_order_queue(100))[1]
 
-middle_prices_3 = count_middle_prices(1, 0.1, 0.1, 10000, create_order_queue(100))
-sigma_tau_3 = []
-for tau in range(1, 1000):
-    middle_prices_tau = [middle_prices_3[i] for i in range(len(middle_prices_3)) if i % tau == 0]
-    returns_tau = [(middle_prices_tau[i] - middle_prices_tau[i - 1]) / middle_prices_tau[i - 1] for i in
-                   range(1, len(middle_prices_tau))]
-    sigma_tau_3.append(np.std(np.array(returns_tau)) / sqrt(tau))
+plt.plot(total_volume1, 'blue')
 
-plt.plot(sigma_tau_3, 'blue')
+plt.plot(total_volume2, 'green')
 
-plt.loglog()
+plt.plot(total_volume3, 'red')
+
+
 plt.savefig("file.png")
